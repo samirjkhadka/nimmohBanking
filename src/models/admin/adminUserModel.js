@@ -3,7 +3,7 @@ const pool = require("../../config/db");
 //Get password hash for an admin user
 async function getAdminPasswordHash(adminUserId) {
   const result = await pool.query(
-    "SELECT password FROM admin_user WHERE id = $1",
+    "SELECT password FROM admin_users WHERE id = $1",
     [adminUserId]
   );
   return result.rows[0]?.password || null;
@@ -33,8 +33,33 @@ async function insertAdminPasswordHistory(adminUserId, passwordHash) {
   );
 }
 
+async function findByUsernameOrEmail(identifier) {
+  const query = `
+    SELECT * FROM admin_users 
+    WHERE phone = $1 OR email = $1
+    LIMIT 1
+  `;
+  const result = await pool.query(query, [identifier]);
+  return result.rows[0];
+}
+
+async function saveOTPSecret(userId, secret) {
+  const query = `UPDATE admin_users SET two_fa_secret = $1 WHERE id = $2;`;
+  await pool.query(query, [secret, userId]);
+}
+
+async function getAdminById (adminUserId) {
+  const result = await pool.query(
+    "SELECT * FROM admin_users WHERE id = $1",
+    [adminUserId]
+  );
+  return result.rows[0];
+}
 module.exports = {
   getAdminPasswordHash,
   updateAdminPassword,
   insertAdminPasswordHistory,
+  findByUsernameOrEmail,
+  saveOTPSecret,
+  getAdminById
 };

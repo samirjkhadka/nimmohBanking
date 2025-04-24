@@ -1,6 +1,4 @@
-const {
-  changeAdminPassword,
-} = require("../../services/admin/changePasswordService");
+
 const { error, success } = require("../../utils/response");
 
 async function handleChangePassword(req, res) {

@@ -7,7 +7,7 @@ const v1Routes = require("./routes/v1");
 const rateLimit = require("express-rate-limit");
 const cookieParser = require("cookie-parser");
 const Limiter = require("./middlewares/rateLimiter");
-const adminPasswordRoutes = require("./routes/admin/changePasswordRoutes");
+ const adminRoutes = require("./routes/admin/adminAuthRoutes");
 dotenv.config();
 
 const app = express();
@@ -30,7 +30,7 @@ app.get("/", (req, res) => {
 
 // Versioned routes
 app.use("/api/v1", v1Routes);
-app.use('api/v1/admin', adminPasswordRoutes);
+ app.use('/api/v1/admin', adminRoutes);
 
 app.use((err, req, res, next) => {
   res.status(500).json({

@@ -1,5 +1,6 @@
 const speakeasy = require("speakeasy");
 const { OTP } = require("../config/config");
+const qrCode = require("qrcode");
 
 function generateSecret(label = "Finexa 2FA") {
   return speakeasy.generateSecret({ length: 20, name: label }); // 20 bytes
@@ -22,8 +23,14 @@ function verifyTOTPToken(secret, token) {
   });
 }
 
+async function generateQRCode(secret) {
+  const otpAuthUrl = secret.otpauth_url;
+  return await qrCode.toDataURL(otpAuthUrl);
+}
+
 module.exports = {
   generateSecret,
   getOTPToken,
   verifyTOTPToken,
+  generateQRCode,
 };
