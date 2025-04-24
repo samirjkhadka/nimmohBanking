@@ -6,6 +6,7 @@ const {
 const {
   generateAccessToken,
   generateRefreshToken,
+  verifyRefreshToken,
 } = require("../../utils/jwt");
 const {
   generateSecret,
@@ -134,6 +135,42 @@ exports.setup2FA = async (req, res) => {
       res,
       "2FA Setup successful",
       { qrCode, secret: secret.base32 },
+      200
+    );
+  } catch (err) {
+    console.error(err);
+    return error(res, "Something went wrong", 500);
+  }
+};
+
+exports.refereshToken = async (req, res) => {
+  if (!req.body) {
+    return error(res, "Invalid request. Request body is required", 400);
+  }
+
+  try {
+    const { refereshToken } = req.body;
+    console.log(refereshToken);
+    if (!refereshToken) {
+      return error(res, "Invalid request. refereshToken is required", 400);
+    }
+
+    const payload = verifyRefreshToken(refereshToken);
+    const user = await getAdminById(payload.id);
+
+    if (!user) {
+      return error(res, "User not found", 400);
+    }
+
+    const newAccessToken = generateAccessToken({
+      id: user.id,
+      username: user.username,
+      roleId: user.role_id,
+    });
+    return success(
+      res,
+      "Token refreshed successfully",
+      { accessToken: newAccessToken },
       200
     );
   } catch (err) {
