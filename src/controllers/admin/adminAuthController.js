@@ -244,7 +244,7 @@ exports.forgotPassword = async (req, res) => {
     await savePasswordResetToken(user.id, token, expiresAt);
 
     await sendPasswordResetEmail(email, token);
-    console.log(token)
+    console.log(token);
     return success(res, "Password reset email sent successfully", 200);
   } catch (err) {
     console.error(err);
@@ -293,24 +293,16 @@ exports.resetPassword = async (req, res) => {
 };
 
 exports.getProfile = async (req, res) => {
+  try {
+    const adminId = req.admin.id;
+    const admin = await getAdminById(adminId);
 
-  try{
-   
-    const adminId =  req.admin.id
-    const admin = await  getAdminById(adminId);
-    
-   
-
-    if(!adminId){
+    if (!adminId) {
       return error(res, "Admin User not found", 400);
     }
 
     return success(res, "Profile fetched successfully", admin, 200);
+  } catch (err) {
+    return error(res, "Error" + err, 500);
   }
-  catch(err){
-    return error(res, 'Error' + err, 500);
-  }
-
-
-
-}
+};
