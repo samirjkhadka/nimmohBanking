@@ -1,7 +1,10 @@
+const { deleteRefreshToken } = require("../../models/admin/refreshTokenModel");
 const {
   findByUsernameOrEmail,
   saveOTPSecret,
   getAdminById,
+  updateAdminPassword,
+  savePasswordHistory,
 } = require("../../models/admin/adminUserModel");
 const {
   generateAccessToken,
@@ -13,9 +16,22 @@ const {
   verifyTOTPToken,
   generateQRCode,
 } = require("../../utils/otp");
-const { comparePassword } = require("../../utils/password");
+const {
+  comparePassword,
+  validatePasswordComplexity,
+  hashPassword,
+} = require("../../utils/password");
 const { error, success } = require("../../utils/response");
 const qrCode = require("qrcode");
+const refreshTokenModel = require("../../models/admin/refreshTokenModel");
+const {
+  savePasswordResetToken,
+  findValidToken,
+  markTokenAsUsed,
+} = require("../../models/admin/passwordResetModel");
+const { sendPasswordResetEmail } = require("../../utils/email");
+const crypto = require("crypto");
+const pool = require("../../config/db");
 
 exports.login = async (req, res) => {
   if (!req.body) {
@@ -90,7 +106,7 @@ exports.verify2FA = async (req, res) => {
     }
 
     const user = await getAdminById(userId);
-    console.log(user);
+
     if (!user || !user.is_2fa_enabled || !user.two_fa_secret) {
       return error(res, "2FA not enabled or invalid user", 400);
     }
@@ -100,7 +116,19 @@ exports.verify2FA = async (req, res) => {
       return error(res, "Invalid 2FA token", 400);
     }
     const accesstoken = generateAccessToken(user);
-    const refereshToken = generateRefreshToken(user);
+    const refereshToken = generateRefreshToken({
+      id: user.id,
+      roleId: user.role_id,
+    });
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 1 day in milliseconds
+
+    await refreshTokenModel.saveRefreshToken({
+      adminUserId: user.id,
+      token: refereshToken,
+      expiresAt,
+      userAgent: req.headers["user-agent"],
+      ip: req.ip,
+    });
 
     return success(res, "2FA verified", { accesstoken, refereshToken }, 200);
   } catch (err) {
@@ -173,6 +201,91 @@ exports.refereshToken = async (req, res) => {
       { accessToken: newAccessToken },
       200
     );
+  } catch (err) {
+    console.error(err);
+    return error(res, "Something went wrong", 500);
+  }
+};
+
+exports.logout = async (req, res) => {
+  try {
+    const refreshToken = req.body.refreshToken;
+    if (!refreshToken) {
+      return error(res, "Invalid request. refereshToken is required", 400);
+    }
+
+    await deleteRefreshToken(refreshToken);
+
+    return success(res, "Logout successful", 200);
+  } catch (err) {
+    return error(res, err, 500);
+  }
+};
+
+exports.forgotPassword = async (req, res) => {
+  if (!req.body) {
+    return error(res, "Invalid request. Request body is required", 400);
+  }
+
+  const { email } = req.body;
+  if (!email) {
+    return error(res, "Invalid request. email is required", 400);
+  }
+
+  try {
+    const user = await findByUsernameOrEmail(email);
+    if (!user) {
+      return error(res, "User not found", 400);
+    }
+
+    const token = crypto.randomBytes(32).toString("hex");
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 1 day in milliseconds
+
+    await savePasswordResetToken(user.id, token, expiresAt);
+
+    await sendPasswordResetEmail(email, token);
+    console.log(token)
+    return success(res, "Password reset email sent successfully", 200);
+  } catch (err) {
+    console.error(err);
+    return error(res, "Something went wrong", 500);
+  }
+};
+
+exports.resetPassword = async (req, res) => {
+  const { token, newPassword } = req.body;
+
+  if (!token || !newPassword) {
+    return error(
+      res,
+      "Invalid request. token and newPassword are required",
+      400
+    );
+  }
+
+  try {
+    const tokenData = await findValidToken(token);
+    if (!tokenData) {
+      return error(res, "Invalid token", 400);
+    }
+
+    const complexityError = validatePasswordComplexity(newPassword);
+    if (complexityError) {
+      return error(res, complexityError, 400);
+    }
+
+    const hashedPassword = await hashPassword(newPassword);
+
+    await updateAdminPassword(
+      tokenData.user_id,
+      hashedPassword,
+      tokenData.updated_by,
+      tokenData.updated_ip,
+      tokenData.updated_platform
+    );
+    await savePasswordHistory(tokenData.user_id, hashedPassword);
+    await markTokenAsUsed(tokenData.id);
+    return success(res, "Password reset successful", 200);
   } catch (err) {
     console.error(err);
     return error(res, "Something went wrong", 500);

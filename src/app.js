@@ -8,6 +8,7 @@ const rateLimit = require("express-rate-limit");
 const cookieParser = require("cookie-parser");
 const Limiter = require("./middlewares/rateLimiter");
  const adminRoutes = require("./routes/admin/adminAuthRoutes");
+ const { verifyAdminToken } = require("./middlewares/auth");
 dotenv.config();
 
 const app = express();
@@ -21,12 +22,7 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use(Limiter);
 
-app.get("/", (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: "Welcome to Nimmoh Agency Banking Admin API",
-  });
-});
+
 
 // Versioned routes
 app.use("/api/v1", v1Routes);

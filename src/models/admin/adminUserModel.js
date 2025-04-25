@@ -19,7 +19,7 @@ async function updateAdminPassword(
 ) {
   return await pool.query(
     `Update admin_users
-        SET Password = $1, updated_by = $2, updated_date_utc = CURRENT_TIMESTAMP, updated_ip = $3, updated_platform = $4
+        SET Password = $1, updated_by = $2, updated_at = CURRENT_TIMESTAMP, source_ip = $3, platform = $4
         WHERE id = $5;`,
     [newPasswordHash, updatedBy, updatedIp, updatedPlatform, adminUserId]
   );
@@ -48,12 +48,18 @@ async function saveOTPSecret(userId, secret) {
   await pool.query(query, [secret, userId]);
 }
 
-async function getAdminById (adminUserId) {
-  const result = await pool.query(
-    "SELECT * FROM admin_users WHERE id = $1",
-    [adminUserId]
-  );
+async function getAdminById(adminUserId) {
+  const result = await pool.query("SELECT * FROM admin_users WHERE id = $1", [
+    adminUserId,
+  ]);
   return result.rows[0];
+}
+
+async function savePasswordHistory(adminUserId, passwordHash) {
+  await pool.query(
+    "INSERT INTO admin_user_password_history (admin_user_id, password_hash, created_date_UTC) VALUES ($1, $2, CURRENT_TIMESTAMP);",
+    [adminUserId, passwordHash]
+  );
 }
 module.exports = {
   getAdminPasswordHash,
@@ -61,5 +67,6 @@ module.exports = {
   insertAdminPasswordHistory,
   findByUsernameOrEmail,
   saveOTPSecret,
-  getAdminById
+  getAdminById,
+  savePasswordHistory,
 };
