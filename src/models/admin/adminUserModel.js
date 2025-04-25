@@ -112,6 +112,54 @@ async function rejectAdminProfileUpdate(pendingId, approverId, reason = null) {
   );
 }
 
+async function getRecentPasswordHashes(adminUserId, limit = 3) {
+  const result = await pool.query(
+    `SELECT password_hash FROM admin_user_password_history 
+     WHERE admin_user_id = $1 
+     ORDER BY created_date_utc DESC 
+     LIMIT $2`,
+    [adminUserId, limit]
+  );
+  return result.rows.map((row) => row.password_hash);
+}
+
+async function updateAdminPassword(adminUserId, newPasswordHash) {
+  await pool.query(
+    `UPDATE admin_users SET password = $1, password_last_changed = NOW(), login_attempts = 0 WHERE id = $2`,
+    [newPasswordHash, adminUserId]
+  );
+
+  await pool.query(
+    `INSERT INTO admin_user_password_history (admin_user_id, password_hash, created_date_utc) 
+     VALUES ($1, $2, NOW())`,
+    [adminUserId, newPasswordHash]
+  );
+}
+
+async function createPasswordResetToken(email, token, expiresAt) {
+  await pool.query(
+    `INSERT INTO password_reset_tokens (email, token, expires_at_utc, created_date_utc) 
+     VALUES ($1, $2, $3, NOW())`,
+    [email, token, expiresAt]
+  );
+}
+
+async function getPasswordResetToken(email, token) {
+  const result = await pool.query(
+    `SELECT * FROM password_reset_tokens 
+     WHERE email = $1 AND token = $2 AND used = false AND expires_at_utc > NOW()`,
+    [email, token]
+  );
+  return result.rows[0];
+}
+
+async function markTokenUsed(email, token) {
+  await pool.query(
+    `UPDATE password_reset_tokens SET used = true WHERE email = $1 AND token = $2`,
+    [email, token]
+  );
+}
+
 module.exports = {
   getAdminPasswordHash,
   updateAdminPassword,
@@ -124,4 +172,9 @@ module.exports = {
   getPendingAdminProfileUpdates,
   approveAdminProfileUpdate,
   rejectAdminProfileUpdate,
+  getRecentPasswordHashes,
+  updateAdminPassword,
+  createPasswordResetToken,
+  getPasswordResetToken,
+  markTokenUsed,
 };

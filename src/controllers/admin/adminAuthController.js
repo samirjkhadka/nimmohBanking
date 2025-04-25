@@ -9,6 +9,7 @@ const {
   getPendingAdminProfileUpdates,
   approveAdminProfileUpdate,
   rejectAdminProfileUpdate,
+  getRecentPasswordHashes,
 } = require("../../models/admin/adminUserModel");
 const {
   generateAccessToken,
@@ -257,12 +258,12 @@ exports.forgotPassword = async (req, res) => {
 };
 
 exports.resetPassword = async (req, res) => {
-  const { token, newPassword } = req.body;
+  const {email,  token, newPassword } = req.body;
 
-  if (!token || !newPassword) {
+  if (!email || !token || !newPassword) {
     return error(
       res,
-      "Invalid request. token and newPassword are required",
+      "Invalid request.Email,  token and newPassword are required",
       400
     );
   }
@@ -369,5 +370,47 @@ exports.rejectProfileUpdate = async (req, res) => {
   } catch (err) {
     console.error("Rejection error:", err);
     return response.error(res, "Error rejecting profile update");
+  }
+};
+
+exports.changePassword = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { oldPassword, newPassword } = req.body;
+
+    if (!oldPassword || !newPassword) {
+      return response.error(res, "Old and new password are required", 400);
+    }
+
+    const user = await getAdminById(userId);
+    if (!user) {
+      return response.error(res, "User not found", 404);
+    }
+
+    const match = await comparePassword(oldPassword, user.password);
+    if (!match) {
+      return response.error(res, "Old password is incorrect", 401);
+    }
+
+    const complexityCheck = validatePasswordComplexity(newPassword);
+    if (complexityCheck !== true) {
+      return response.error(res, complexityCheck || "Password does not meet complexity requirements", 400);
+    }
+
+    const previousHashes = await getRecentPasswordHashes(userId);
+    for (let hash of previousHashes) {
+      const reused = await comparePassword(newPassword, hash);
+      if (reused) {
+        return response.error(res, "New password must not match the last 3 passwords", 400);
+      }
+    }
+
+    const newHashed = await hashPassword(newPassword);
+    await updateAdminPassword(userId, newHashed);
+
+    return response.success(res, "Password changed successfully");
+  } catch (err) {
+    console.error("Change password failed:", err);
+    return response.error(res, "Failed to change password");
   }
 };

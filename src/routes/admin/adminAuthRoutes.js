@@ -32,6 +32,11 @@ router.post(
   verifyAdminToken,
   adminAuthController.rejectProfileUpdate
 );
+router.post(
+  "/change-password",
+  verifyAdminToken,
+  adminAuthController.changePassword
+);
 router.get("/dashboard", verifyAdminToken, (req, res) => {
   return success(res, "Dashboard", { user: req.user }, 200);
 });
