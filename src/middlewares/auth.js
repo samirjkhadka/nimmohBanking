@@ -28,9 +28,11 @@ function verifyAdminToken  (req, res, next)  {
   }
 
   const token = authHeader.split(" ")[1];
+
   try {
     const decoded = verifyAccessToken(token);
     req.admin = decoded;
+    
     next();
   } catch (err) {
     return error(res, "UnAuthorised. Invalid or expired token", 401);

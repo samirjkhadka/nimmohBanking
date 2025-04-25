@@ -291,3 +291,26 @@ exports.resetPassword = async (req, res) => {
     return error(res, "Something went wrong", 500);
   }
 };
+
+exports.getProfile = async (req, res) => {
+
+  try{
+   
+    const adminId =  req.admin.id
+    const admin = await  getAdminById(adminId);
+    
+   
+
+    if(!adminId){
+      return error(res, "Admin User not found", 400);
+    }
+
+    return success(res, "Profile fetched successfully", admin, 200);
+  }
+  catch(err){
+    return error(res, 'Error' + err, 500);
+  }
+
+
+
+}

@@ -11,6 +11,7 @@ router.post("/refresh-token", adminAuthController.refereshToken);
 router.post("/logout", adminAuthController.logout);
 router.post("/forgot-password", adminAuthController.forgotPassword);
 router.post("/reset-password", adminAuthController.resetPassword);
+router.get("/profile",verifyAdminToken, adminAuthController.getProfile);
 router.get("/dashboard", verifyAdminToken, (req, res) => {
   return success(res, "Dashboard", { user: req.user }, 200);
 });
