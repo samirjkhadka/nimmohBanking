@@ -61,6 +61,57 @@ async function savePasswordHistory(adminUserId, passwordHash) {
     [adminUserId, passwordHash]
   );
 }
+
+async function queueAdminProfileUpdate(adminId, updates) {
+  const { username, email } = updates;
+
+  await pool.query(
+    `INSERT INTO admin_user_updates_pending 
+      (admin_user_id, new_username, new_email, status, requested_by, requested_date_utc) 
+     VALUES ($1, $2, $3, 'PENDING', $1, NOW())`,
+    [adminId, username, email]
+  );
+}
+
+async function getPendingAdminProfileUpdates() {
+  const result =
+    await pool.query(`SELECT pup.id, pup.admin_user_id, pup.new_username, pup.new_email, pup.status, 
+           pup.requested_date_utc, u.username AS current_username, u.email AS current_email
+    FROM admin_user_updates_pending pup
+    JOIN admin_users u ON pup.admin_user_id = u.id
+    WHERE pup.status = 'PENDING'`);
+  return result.rows;
+}
+async function approveAdminProfileUpdate(pendingId, approverId) {
+  const result = await pool.query(
+    `UPDATE admin_users 
+     SET username = pup.new_username, email = pup.new_email 
+     FROM admin_user_updates_pending pup 
+     WHERE admin_users.id = pup.admin_user_id 
+       AND pup.id = $1 
+       AND pup.status = 'PENDING'`,
+    [pendingId]
+  );
+
+  await pool.query(
+    `UPDATE admin_user_updates_pending 
+     SET status = 'APPROVED', approved_by = $1, approved_date_utc = NOW() 
+     WHERE id = $2`,
+    [approverId, pendingId]
+  );
+
+  return result.rowCount > 0;
+}
+
+async function rejectAdminProfileUpdate(pendingId, approverId, reason = null) {
+  await pool.query(
+    `UPDATE admin_user_updates_pending 
+     SET status = 'REJECTED', approved_by = $1, approved_date_utc = NOW(), rejection_reason = $2 
+     WHERE id = $3`,
+    [approverId, reason, pendingId]
+  );
+}
+
 module.exports = {
   getAdminPasswordHash,
   updateAdminPassword,
@@ -69,4 +120,8 @@ module.exports = {
   saveOTPSecret,
   getAdminById,
   savePasswordHistory,
+  queueAdminProfileUpdate,
+  getPendingAdminProfileUpdates,
+  approveAdminProfileUpdate,
+  rejectAdminProfileUpdate,
 };

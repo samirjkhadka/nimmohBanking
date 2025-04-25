@@ -5,6 +5,10 @@ const {
   getAdminById,
   updateAdminPassword,
   savePasswordHistory,
+  queueAdminProfileUpdate,
+  getPendingAdminProfileUpdates,
+  approveAdminProfileUpdate,
+  rejectAdminProfileUpdate,
 } = require("../../models/admin/adminUserModel");
 const {
   generateAccessToken,
@@ -304,5 +308,66 @@ exports.getProfile = async (req, res) => {
     return success(res, "Profile fetched successfully", admin, 200);
   } catch (err) {
     return error(res, "Error" + err, 500);
+  }
+};
+
+exports.requestProfileUpdate = async (req, res) => {
+  try {
+    const adminId = req.admin.id;
+    const { username, email } = req.body;
+
+    if (!username && !email) {
+      return error(
+        res,
+        "Invalid request. username and email are required",
+        400
+      );
+    }
+    await queueAdminProfileUpdate(adminId, { username, email });
+
+    return success(res, "Profile update request sent successfully", 200);
+  } catch (err) {
+    console.error(err);
+    return error(res, "Something went wrong", 500);
+  }
+};
+
+exports.listPendingProfileUpdates = async (req, res) => {
+  try {
+    const rows = await getPendingAdminProfileUpdates();
+    return response.success(res, "Pending updates retrieved", rows);
+  } catch (err) {
+    console.error("Fetch pending updates failed:", err);
+    return response.error(res, "Failed to fetch pending updates");
+  }
+};
+
+exports.approveProfileUpdate = async (req, res) => {
+  try {
+    const approverId = req.user.id;
+    const { pendingId } = req.body;
+
+    const success = await approveAdminProfileUpdate(pendingId, approverId);
+    if (!success) {
+      return response.error(res, "Approval failed or already approved", 400);
+    }
+
+    return response.success(res, "Profile update approved");
+  } catch (err) {
+    console.error("Approval error:", err);
+    return response.error(res, "Error approving profile update");
+  }
+};
+
+exports.rejectProfileUpdate = async (req, res) => {
+  try {
+    const approverId = req.user.id;
+    const { pendingId, reason } = req.body;
+
+    await rejectAdminProfileUpdate(pendingId, approverId, reason);
+    return response.success(res, "Profile update rejected");
+  } catch (err) {
+    console.error("Rejection error:", err);
+    return response.error(res, "Error rejecting profile update");
   }
 };
